@@ -1,0 +1,22 @@
+# deps
+node_modules/
+**/node_modules/
+
+# builds
+dist/
+**/dist/
+server/public/app/
+
+# env / secrets
+.env
+*.local
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp

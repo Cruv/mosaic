@@ -1,0 +1,53 @@
+# Mosaic MediaMTX config — WHIP ingest / WHEP playback for a LAN homelab.
+# Only the keys we actually use are set; everything else stays at MediaMTX defaults.
+logLevel: info
+logDestinations: [stdout]
+
+# --- Control API: the Mosaic server polls /v3/paths/list for live-feed discovery ---
+api: yes
+apiAddress: 127.0.0.1:9997        # localhost-only; the Mosaic server shares the host network
+
+metrics: no
+pprof: no
+
+# --- WebRTC (WHIP publish + WHEP playback) ---
+webrtc: yes
+webrtcAddress: :8889              # HTTP signaling + ICE-TCP (must match MEDIAMTX_WEBRTC_PORT)
+webrtcLocalUDPAddress: :8189      # media (UDP)
+webrtcLocalTCPAddress: ''         # leave off; UDP is preferred on a LAN
+# webrtcAdditionalHosts is injected at runtime from $HOST_IP via the
+# MTX_WEBRTCADDITIONALHOSTS env var (see docker-compose.yml). On a single LAN you
+# do NOT need STUN/TURN — advertising the LAN IP is enough.
+webrtcAdditionalHosts: []
+webrtcICEServers2: []
+
+# --- Protocols we don't use: turn them off to shrink the surface ---
+rtsp: no
+rtmp: no
+hls: no
+srt: no
+
+# --- Auth: a token is required to PUBLISH; READ/PLAYBACK is open on the LAN ---
+# OBS puts "streamer:<password>" in its Bearer Token field. The password is
+# injected from $MEDIAMTX_PUBLISH_PASS via MTX_AUTHINTERNALUSERS_0_PASS.
+authMethod: internal
+authInternalUsers:
+  - user: streamer
+    pass: changeme
+    ips: []
+    permissions:
+      - action: publish
+  - user: any                     # anonymous viewers may read/play any path
+    permissions:
+      - action: read
+      - action: playback
+  - user: any                     # admin (API/metrics) restricted to localhost
+    ips: ['127.0.0.1', '::1']
+    permissions:
+      - action: api
+      - action: metrics
+      - action: pprof
+
+# Any path is created on demand when something publishes to it (drop-in/drop-out).
+pathDefaults:
+  source: publisher

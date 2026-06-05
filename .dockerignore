@@ -1,0 +1,8 @@
+# Never copy host (Windows) node_modules into the Linux image — native binaries
+# (esbuild/vite/rollup) are platform-specific. Deps are installed fresh in-image.
+**/node_modules
+**/dist
+server/public/app
+.env
+.git
+*.log

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mosaic — Timecode Overlay</title>
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+  #band { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: block; }
+  #debug {
+    position: fixed; left: 8px; top: 6vh; font: 12px/1.4 ui-monospace, monospace;
+    color: #0f0; background: rgba(0,0,0,.5); padding: 4px 6px; border-radius: 4px;
+    display: none; white-space: pre;
+  }
+  body.debug #debug { display: block; }
+</style>
+</head>
+<body>
+<!-- Add this whole page as an OBS "Browser" source sized to your output canvas
+     (e.g. 1920x1080) at position 0,0. The thin band at the very top carries an
+     invisible-to-viewers timecode; Mosaic crops it before showing the feed.
+     Append ?debug=1 to the URL to see the sync status while setting up. -->
+<canvas id="band"></canvas>
+<div id="debug"></div>
+<script type="module">
+  // ---- Constants: MUST MATCH web/src/sync/timecode.ts ----
+  const TC_CAL = 2, TC_DATA = 40, TC_CHECK = 8;
+  const TC_CELLS = TC_CAL + TC_DATA + TC_CHECK;        // 50
+  const TC_BAND_FRACTION = 0.035;
+  const TC_EPOCH_MS = Date.UTC(2025, 0, 1);
+
+  const bytesOf = (v) => { const o = []; for (let k = 4; k >= 0; k--) o.push(Math.floor(v / 2 ** (8 * k)) % 256); return o; };
+  const checksum = (v) => bytesOf(v).reduce((a, b) => a + b, 0) & 0xff;
+  const bitAt = (v, i) => Math.floor(v / 2 ** i) % 2;
+
+  function encodeCells(serverMs) {
+    const v = Math.max(0, Math.round(serverMs - TC_EPOCH_MS));
+    const cells = [1, 0]; // white ref, black ref
+    for (let i = TC_DATA - 1; i >= 0; i--) cells.push(bitAt(v, i));
+    const cs = checksum(v);
+    for (let i = TC_CHECK - 1; i >= 0; i--) cells.push((cs >> i) & 1);
+    return cells;
+  }
+
+  // ---- Time sync to the Mosaic server clock (NTP-style, keep min-RTT sample) ----
+  // The overlay disciplines itself to the SERVER, so the burned-in time is correct
+  // even if the streamer's own PC clock is wrong. Only the server needs NTP.
+  let offset = 0;          // serverNow ≈ Date.now() + offset
+  let bestRtt = Infinity;
+  let synced = false;
+  let lastRtt = NaN;
+
+  function connect() {
+    const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+    let pingTimer = 0, id = 0;
+    ws.onopen = () => {
+      try { ws.send(JSON.stringify({ t: 'hello', name: 'overlay' })); } catch {}
+      const ping = () => { try { ws.send(JSON.stringify({ t: 'time:ping', id: id++, c0: Date.now() })); } catch {} };
+      ping();
+      pingTimer = setInterval(ping, 2000);
+    };
+    ws.onmessage = (ev) => {
+      let m; try { m = JSON.parse(ev.data); } catch { return; }
+      if (m.t !== 'time:pong') return;
+      const c1 = Date.now();
+      const rtt = c1 - m.c0;
+      lastRtt = rtt;
+      if (rtt < bestRtt) {            // lowest-RTT sample => least asymmetric => best offset
+        bestRtt = rtt;
+        offset = m.s - (m.c0 + c1) / 2;
+        synced = true;
+      }
+    };
+    const cleanup = () => { clearInterval(pingTimer); setTimeout(connect, 1500); };
+    ws.onclose = cleanup;
+    ws.onerror = () => { try { ws.close(); } catch {} };
+  }
+  connect();
+
+  const serverNow = () => Date.now() + offset;
+
+  // ---- Render loop ----
+  const canvas = document.getElementById('band');
+  const ctx = canvas.getContext('2d');
+  const debugEl = document.getElementById('debug');
+  if (new URLSearchParams(location.search).has('debug')) document.body.classList.add('debug');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function frame() {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H); // keep everything below the band transparent
+    if (synced) {
+      const cells = encodeCells(serverNow());
+      const bandH = Math.max(2, Math.round(H * TC_BAND_FRACTION));
+      const cw = W / TC_CELLS;
+      for (let i = 0; i < TC_CELLS; i++) {
+        ctx.fillStyle = cells[i] ? '#fff' : '#000';
+        // +1px overscan on width avoids hairline seams between cells after scaling.
+        ctx.fillRect(Math.floor(i * cw), 0, Math.ceil(cw) + 1, bandH);
+      }
+    }
+    if (document.body.classList.contains('debug')) {
+      const d = new Date(serverNow());
+      debugEl.textContent =
+        `synced: ${synced}\noffset: ${offset.toFixed(1)} ms\nrtt: ${lastRtt.toFixed(0)} (best ${bestRtt === Infinity ? '-' : bestRtt.toFixed(0)})\nserver: ${d.toISOString()}`;
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>

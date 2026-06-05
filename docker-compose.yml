@@ -1,0 +1,44 @@
+---
+# Mosaic — synchronized multi-stream viewer.
+#
+# Drop this into your stacks folder (e.g. /mnt/NVME_Pool/Docker/Stacks/mosaic)
+# next to mediamtx.yml and a .env that sets HOST_IP, then:  docker compose up -d
+#
+# NETWORKING NOTE: unlike my other stacks, this is NOT bound to 127.0.0.1 behind
+# Nginx Proxy Manager. WebRTC media needs host networking — Docker's userland NAT
+# rewrites UDP source ports and breaks ICE, and MediaMTX can't relay media from
+# behind a reverse proxy. (You can still front the :8080 web UI with NPM by
+# proxying to 127.0.0.1:8080 if you want TLS on the UI itself.)
+services:
+  # --- Media plane: WHIP ingest (OBS) + WHEP playback (browser) ---
+  mediamtx:
+    image: bluenviron/mediamtx:latest        # upstream image; pin e.g. :1.13.1 for reproducibility
+    container_name: mosaic-mediamtx
+    network_mode: host
+    environment:
+      - TZ=${TZ:-Etc/UTC}
+      - MTX_WEBRTCADDITIONALHOSTS=${HOST_IP}                       # advertise this box's LAN IP to ICE
+      - MTX_AUTHINTERNALUSERS_0_PASS=${MEDIAMTX_PUBLISH_PASS:-changeme}
+    volumes:
+      # Ships in the repo. On a TrueNAS stack you can instead point this at your
+      # pool, e.g. /mnt/NVME_Pool/Docker/Stacks/mosaic/mediamtx.yml:/mediamtx.yml:ro
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
+    restart: unless-stopped
+
+  # --- Control plane + viewer: web UI, WebSocket (chat/roster/time-sync), overlay ---
+  mosaic:
+    image: ghcr.io/cruv/mosaic:latest
+    # build: .          # uncomment to build locally instead of pulling from GHCR
+    container_name: mosaic
+    network_mode: host  # shares host net so it reaches MediaMTX's localhost API (:9997)
+    depends_on:
+      - mediamtx
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Etc/UTC}
+      - HOST_IP=${HOST_IP}
+      - MOSAIC_PORT=${MOSAIC_PORT:-8080}
+      - MEDIAMTX_API_URL=http://127.0.0.1:9997
+      - MEDIAMTX_WEBRTC_PORT=${MEDIAMTX_WEBRTC_PORT:-8889}
+    restart: unless-stopped
