@@ -16,12 +16,12 @@ comes from.
 ## Contents
 
 - [Architecture](#architecture)
-- [Quick start](#quick-start)
+- [Usage](#usage)
+- [Parameters](#parameters)
 - [Connecting OBS (streamer setup)](#connecting-obs-streamer-setup)
 - [Using the viewer](#using-the-viewer)
 - [How the sync engine works](#how-the-sync-engine-works)
 - [Sync quality: alignment, latency, and error sources](#sync-quality-alignment-latency-and-error-sources)
-- [Configuration reference](#configuration-reference)
 - [Local development (no Docker)](#local-development-no-docker)
 - [Known limitations & roadmap](#known-limitations--roadmap)
 - [Repository layout](#repository-layout)
@@ -63,38 +63,118 @@ instant. See [How the sync engine works](#how-the-sync-engine-works).
 
 ---
 
-## Quick start
+## Usage
 
-**Prerequisites:** Docker + Docker Compose on a Linux host (your TrueNAS SCALE box or a Linux VM).
-Host networking is required (a Linux feature — see note below). The server's clock should be
-NTP-disciplined (`chrony`/`systemd-timesyncd`) — that clock is the master timeline everything
-aligns to.
+Set **`HOST_IP`** (this box's LAN IP) and you're done — viewers open `http://<HOST_IP>:8080` and
+streamers point OBS at `http://<HOST_IP>:8889/<name>/whip` (see
+[Connecting OBS](#connecting-obs-streamer-setup)). The image is published multi-arch (amd64 + arm64)
+to GHCR and follows LinuxServer.io (`PUID`/`PGID`/`TZ`) conventions. Run it on a Linux host (TrueNAS
+SCALE box or a Linux VM) whose clock is NTP-disciplined (`chrony`/`systemd-timesyncd`) — that clock
+is the shared timeline every feed aligns to.
+
+> **Host networking is required** (not bound behind Nginx Proxy Manager like my other stacks): WebRTC
+> media can't traverse Docker's NAT or a reverse proxy. You *can* still front the `:8080` web UI with
+> NPM (proxy to `127.0.0.1:8080`) for TLS on the UI itself.
+
+First grab the MediaMTX config into your stack folder:
 
 ```bash
-git clone https://github.com/Cruv/mosaic.git
-cd mosaic                      # or drop compose + mediamtx.yml + .env into your stacks folder
-cp .env.example .env
-#  >>> edit .env: set HOST_IP to this box's LAN IP (e.g. 192.168.1.50) <<<
-
-docker compose up -d           # pulls ghcr.io/cruv/mosaic:latest
-# To build locally instead, uncomment `build: .` in docker-compose.yml, then:
-#   docker compose up --build -d
+mkdir -p mediamtx
+curl -fsSL https://raw.githubusercontent.com/Cruv/mosaic/main/mediamtx/mediamtx.yml -o mediamtx/mediamtx.yml
 ```
 
-Then:
+### docker-compose (recommended)
 
-- **Viewers** open `http://<HOST_IP>:8080`
-- **Streamers** point OBS at `http://<HOST_IP>:8889/<their-name>/whip` (see below)
+```yaml
+---
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mosaic-mediamtx
+    network_mode: host
+    environment:
+      - TZ=Etc/UTC
+      - MTX_WEBRTCADDITIONALHOSTS=192.168.1.50    # <-- this box's LAN IP
+      - MTX_AUTHINTERNALUSERS_0_PASS=changeme     # OBS publish password
+    volumes:
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
+    restart: unless-stopped
 
-The Mosaic image follows LinuxServer.io conventions (`PUID`/`PGID`/`TZ`) and is published multi-arch
-(amd64 + arm64) to GHCR by `.github/workflows/docker-publish.yml`.
+  mosaic:
+    image: ghcr.io/cruv/mosaic:latest
+    container_name: mosaic
+    network_mode: host
+    depends_on:
+      - mediamtx
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - HOST_IP=192.168.1.50                       # <-- same LAN IP
+      - MOSAIC_PORT=8080
+      - MEDIAMTX_API_URL=http://127.0.0.1:9997
+      - MEDIAMTX_WEBRTC_PORT=8889
+    restart: unless-stopped
+```
 
-> **Why host networking (and not bound behind Nginx Proxy Manager like my other stacks)?** Docker's
-> userland NAT rewrites UDP source ports, which breaks WebRTC ICE, and MediaMTX can't relay media
-> from behind a reverse proxy. Both services run `network_mode: host`. You *can* still front the
-> `:8080` web UI with NPM (proxy to `127.0.0.1:8080`) if you want TLS on the UI. On TrueNAS SCALE the
-> most reliable route is a Linux VM (or a custom-app/compose deployment) with host networking; set
-> `HOST_IP` to that host's LAN IP.
+```bash
+docker compose up -d
+```
+
+> **First pull:** `ghcr.io/cruv/mosaic` is private by default — make the package public (repo →
+> **Packages → mosaic → Package settings → visibility**) or `docker login ghcr.io`. The repo also
+> ships this compose with values read from a `.env` (`cp .env.example .env`); to build locally
+> instead of pulling, uncomment `build: .` under the `mosaic` service and `docker compose up --build -d`.
+
+### docker cli
+
+```bash
+docker run -d --name mosaic-mediamtx --network host \
+  -e TZ=Etc/UTC \
+  -e MTX_WEBRTCADDITIONALHOSTS=192.168.1.50 \
+  -e MTX_AUTHINTERNALUSERS_0_PASS=changeme \
+  -v "$(pwd)/mediamtx/mediamtx.yml:/mediamtx.yml:ro" \
+  --restart unless-stopped \
+  bluenviron/mediamtx:latest
+
+docker run -d --name mosaic --network host \
+  -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC \
+  -e HOST_IP=192.168.1.50 \
+  -e MOSAIC_PORT=8080 \
+  -e MEDIAMTX_API_URL=http://127.0.0.1:9997 \
+  -e MEDIAMTX_WEBRTC_PORT=8889 \
+  --restart unless-stopped \
+  ghcr.io/cruv/mosaic:latest
+```
+
+---
+
+## Parameters
+
+Container settings (compose `environment:` / docker `-e`), LinuxServer.io style. Both services share
+the **host network**, so there are no `-p` mappings — the ports below are what each service binds.
+
+| Parameter | Function |
+| :---: | --- |
+| `--network host` | **Required** on both services. WebRTC (ICE/UDP) can't traverse Docker NAT or a reverse proxy. |
+| `-e HOST_IP=192.168.1.50` | **Required.** This box's LAN IP — advertised as the WebRTC ICE candidate and used by browsers to reach WHEP media. On the `mediamtx` service the same value is `MTX_WEBRTCADDITIONALHOSTS`. |
+| `-e PUID=1000` | UserID the `mosaic` container runs as. |
+| `-e PGID=1000` | GroupID the `mosaic` container runs as. |
+| `-e TZ=Etc/UTC` | Timezone, e.g. `America/Indiana/Indianapolis`. |
+| `-e MOSAIC_PORT=8080` | Web UI + WebSocket (chat / roster / reactions / time-sync). |
+| `-e MEDIAMTX_WEBRTC_PORT=8889` | MediaMTX WHIP/WHEP port (must match `webrtcAddress` in `mediamtx.yml`). |
+| `-e MEDIAMTX_PUBLISH_PASS=changeme` | OBS publish password on the `mediamtx` service (`MTX_AUTHINTERNALUSERS_0_PASS`). OBS bearer token = `streamer:<this>`; viewers need none. |
+| `-v .../mediamtx/mediamtx.yml:/mediamtx.yml:ro` | MediaMTX config (ships in the repo). |
+
+**Ports in use:** `8080` web UI · `8889` WebRTC signaling/ICE-TCP · `8189/udp` WebRTC media ·
+`9997` MediaMTX API (localhost only).
+
+### Sync engine knobs
+
+In the viewer's controls, or `web/src/sync/config.ts` for defaults: `targetBehindLiveMs` (400),
+`maxBehindLiveMs` (800), `maxBufferMs` (1000), `jitterMarginMs` (150), `bufferWidth` (640 — frame
+buffer resolution; bounds memory, raise for sharper program output), `alignAudio` (true),
+`useTimecode` (true), `statsPollMs` (500).
 
 ---
 
@@ -256,32 +336,6 @@ coarse, derived `estimatedPlayoutTimestamp`); and MediaMTX's SR/`abs-capture-tim
 undocumented (one user measured **zero** SR packets through it). The burned-in timecode is the robust
 substitute that achieves the *same goal* (absolute per-feed capture time) and is measured end-to-end
 off the displayed pixels. The SR path remains wired up as the fallback for when it does work.
-
----
-
-## Configuration reference
-
-### Environment (`.env`)
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `HOST_IP` | `192.168.1.50` | **Required.** This box's LAN IP — advertised as the WebRTC ICE candidate and used by the browser to reach WHEP media. |
-| `MOSAIC_PORT` | `8080` | Mosaic server (web UI + WebSocket + overlay). |
-| `MEDIAMTX_WEBRTC_PORT` | `8889` | MediaMTX WHIP/WHEP port. Must match `webrtcAddress` in `mediamtx/mediamtx.yml`. |
-| `MEDIAMTX_PUBLISH_PASS` | `changeme` | Publisher password; OBS bearer token is `streamer:<this>`. |
-| `PUID` / `PGID` | `1000` | LinuxServer.io-style: the Mosaic container runs as this uid/gid, not root. |
-| `TZ` | `Etc/UTC` | Timezone for log timestamps. |
-
-### Sync engine knobs (in the viewer, or `web/src/sync/config.ts` for defaults)
-
-`targetBehindLiveMs` (400), `maxBehindLiveMs` (800), `maxBufferMs` (1000), `jitterMarginMs` (150),
-`bufferWidth` (640 — frame buffer resolution; bounds memory, raise for sharper program output),
-`alignAudio` (true), `useTimecode` (true), `statsPollMs` (500).
-
-### Ports
-
-`8080/tcp` Mosaic · `8889/tcp` MediaMTX WebRTC signaling/ICE-TCP · `8189/udp` MediaMTX media ·
-`9997/tcp` MediaMTX API (localhost only).
 
 ---
 
