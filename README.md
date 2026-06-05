@@ -121,10 +121,9 @@ services:
 docker compose up -d
 ```
 
-> **First pull:** `ghcr.io/cruv/mosaic` is private by default — make the package public (repo →
-> **Packages → mosaic → Package settings → visibility**) or `docker login ghcr.io`. The repo also
-> ships this compose with values read from a `.env` (`cp .env.example .env`); to build locally
-> instead of pulling, uncomment `build: .` under the `mosaic` service and `docker compose up --build -d`.
+> The image (`ghcr.io/cruv/mosaic`) is public, so this pulls with no login. The repo also ships this
+> compose with values read from a `.env` (`cp .env.example .env`); to build locally instead of
+> pulling, uncomment `build: .` under the `mosaic` service and run `docker compose up --build -d`.
 
 ### docker cli
 
