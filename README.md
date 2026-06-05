@@ -302,6 +302,18 @@ cd web && npm run selftest
 
 Open `http://localhost:5173`. (For WHEP to localhost, browse from the same machine, or set `HOST_IP`.)
 
+### Releasing
+
+Add a `## vX.Y.Z` section to `CHANGELOG.md`, then tag and push:
+
+```bash
+git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
+```
+
+Pushing the tag triggers two workflows: `docker-publish.yml` builds and pushes the multi-arch image
+to `ghcr.io/cruv/mosaic`, and `release.yml` cuts a GitHub Release using that CHANGELOG section plus
+GitHub's auto-generated "What's Changed".
+
 ---
 
 ## Known limitations & roadmap
@@ -329,7 +341,10 @@ mosaic/
 ├─ Dockerfile                  # multi-stage: build web + server → one runtime image
 ├─ entrypoint.sh               # PUID/PGID/TZ (LinuxServer.io-style)
 ├─ .env.example
-├─ .github/workflows/docker-publish.yml   # multi-arch GHCR publish
+├─ CHANGELOG.md                # per-version notes (drives GitHub Releases)
+├─ .github/workflows/
+│   ├─ docker-publish.yml      # multi-arch GHCR publish on push/tag
+│   └─ release.yml             # GitHub Release from CHANGELOG on v* tags
 ├─ mediamtx/mediamtx.yml       # WHIP/WHEP + API config
 ├─ server/                     # Node/TS control plane
 │  └─ src/ (index, hub, discovery, config, types)
