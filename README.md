@@ -150,6 +150,37 @@ docker run -d --name mosaic --network host \
   ghcr.io/cruv/mosaic:latest
 ```
 
+### Public access (NPM + Let's Encrypt)
+
+Want a remote friend to join with just a browser + OBS — no Tailscale? Front Mosaic with Nginx Proxy
+Manager + a Let's Encrypt cert. That handles HTTPS/secure-context and removes the "OBS rejects
+self-signed cert" blocker. **But NPM only proxies the HTTP/WebSocket signaling — the WebRTC _media_
+is UDP and bypasses the proxy.** You need both halves:
+
+**1. Signaling (NPM + TLS)** — two proxy hosts, each with a cert and **Websockets Support** enabled:
+
+| Domain | Forward to | Used by |
+| --- | --- | --- |
+| `watch.example.com` | `127.0.0.1:8080` | viewers (UI, WebSocket, WHEP signaling) |
+| `ingest.example.com` | `127.0.0.1:8889` | OBS publish |
+
+Viewers open `https://watch.example.com`; OBS **Server** = `https://ingest.example.com/<name>/whip`.
+The web app auto-upgrades to `wss://` and uses a same-origin `/whep` path under HTTPS — no config
+change needed. (Serving over HTTPS also makes the viewer a *secure context*, unlocking the WebCodecs
+upgrade path.)
+
+**2. Media (UDP — the part NPM can't carry):**
+- **Port-forward `8189/udp`** on your router to this host.
+- Advertise your public address and enable STUN. In `.env` set `HOST_IP=<your.public.ip>` (or both
+  LAN + public: `MTX_WEBRTCADDITIONALHOSTS=192.168.1.50,<public-ip>`), and uncomment the STUN entry
+  in `mediamtx/mediamtx.yml`.
+- If a viewer is behind a **strict/symmetric NAT** and media still won't connect, add a **TURN**
+  relay (e.g. `coturn`) to `webrtcICEServers2` — STUN alone can't punch every NAT.
+
+**Heads-up:** this exposes the server publicly — keep `MEDIAMTX_PUBLISH_PASS` set, and decide whether
+viewing should stay open to the LAN-default "anyone". (Single domain instead of two? You'd add a Node
+WHIP proxy or an NPM regex location for `/<name>/whip` → `:8889`.)
+
 ---
 
 ## Parameters

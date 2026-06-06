@@ -17,9 +17,17 @@ webrtcLocalUDPAddress: :8189      # media (UDP)
 webrtcLocalTCPAddress: ''         # leave off; UDP is preferred on a LAN
 # webrtcAdditionalHosts is injected at runtime from $HOST_IP via the
 # MTX_WEBRTCADDITIONALHOSTS env var (see docker-compose.yml). On a single LAN you
-# do NOT need STUN/TURN — advertising the LAN IP is enough.
+# do NOT need STUN/TURN — advertising the LAN IP is enough. For PUBLIC access
+# (reverse proxy + TLS), set this to your public IP (or "LAN_IP,PUBLIC_IP") and
+# port-forward 8189/udp to this host. See README → "Public access".
 webrtcAdditionalHosts: []
+# STUN helps NAT discovery for public access; add a TURN relay only if a viewer is
+# behind a strict/symmetric NAT and direct UDP fails. (Neither is needed on a LAN.)
 webrtcICEServers2: []
+#   - url: stun:stun.l.google.com:19302
+#   - url: turn:turn.example.com:3478
+#     username: turnuser
+#     password: turnpass
 
 # --- Protocols we don't use: turn them off to shrink the surface ---
 rtsp: no

@@ -106,9 +106,11 @@ The prototype targets a single LAN. The easiest way to include a remote friend i
 3. Set `HOST_IP=100.x.y.z` in `.env`, then `docker compose up -d` again.
 4. Everyone uses that **Tailscale IP** as `SERVER_IP` in Part 2.
 
-(Without Tailscale you'd need to port-forward `8080/tcp`, `8889/tcp`, and `8189/udp` publicly **and**
-put real TLS in front of the WHIP endpoint — OBS rejects self-signed certs for non-localhost.
-Tailscale avoids all of it.)
+**Friend can't install anything?** Go public with **Nginx Proxy Manager + Let's Encrypt** instead:
+they then need only a browser + OBS. You provide the cert (HTTPS fixes the OBS self-signed-cert
+blocker), port-forward `8189/udp`, and advertise your public IP. Full steps in
+[README → Public access](README.md#public-access-npm--lets-encrypt). Note NPM proxies the *signaling*
+only — the WebRTC media is UDP and still needs that port-forward (+ STUN, or TURN behind strict NAT).
 
 ---
 
