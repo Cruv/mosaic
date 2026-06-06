@@ -266,8 +266,9 @@ clock, so your PC's clock does **not** need to be accurate — only the server's
 
 - **Crop mode (default):** leave the top ~3.5% clear; the viewer clips it (a tiny zoom-to-fill, no
   black bar). Simplest — no resolution change.
-- **Overscan mode (zero image loss):** set your OBS output to **1920 × 1104** so the band lives in
-  24 extra px *above* your 1080 content; the viewer crops back to a pristine 1080.
+- **Overscan mode (zero image loss):** set your OBS **base canvas** to **1920 × 1120** and place your
+  1080 content in the bottom — the ~40px band then lives in the extra height *above* it, and the
+  viewer crops back to a pristine 1080. (Band height = 3.5% of the frame.)
 
 > **No overlay?** The feed still works — the engine falls back to coarse WebRTC-stats timing and the
 > roster tags it `~` instead of `TC`. It just won't hit the frame-level target. See below.
