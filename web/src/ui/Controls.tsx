@@ -87,6 +87,24 @@ export function Controls({
         Timecode
       </label>
 
+      {config.useTimecode && (
+        <div className="ctl-group">
+          <span className="ctl-label" title="How much of the top edge to crop to hide the timecode band — raise until it's fully gone">
+            crop
+          </span>
+          <input
+            className="range"
+            type="range"
+            min={0.03}
+            max={0.15}
+            step={0.005}
+            value={config.cropFraction}
+            onChange={(e) => onConfig({ cropFraction: Number(e.target.value) })}
+          />
+          <span className="ctl-value">{Math.round(config.cropFraction * 100)}%</span>
+        </div>
+      )}
+
       <button className="btn btn-sm" onClick={onToggleHud}>
         Sync HUD
       </button>

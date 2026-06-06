@@ -18,9 +18,8 @@ export const TC_DATA = 40; // ms since TC_EPOCH_MS, MSB-first
 export const TC_CHECK = 8; // (sum of the 5 data bytes) & 0xff, MSB-first
 export const TC_CELLS = TC_CAL + TC_DATA + TC_CHECK; // 50 cells across the width
 export const TC_BAND_FRACTION = 0.035; // band height (what the overlay draws / the reader samples)
-// The viewer crops a bit MORE than the band so the H.264 ringing/smear that the
-// band's hard edges leave in the macroblock row beneath it is removed too.
-export const TC_CROP_FRACTION = 0.06;
+// The viewer's crop amount lives in SyncConfig.cropFraction (a bit larger than the
+// band, and tunable live, so it also removes the H.264 ringing below the band).
 export const TC_EPOCH_MS = Date.UTC(2025, 0, 1); // keeps the payload within 40 bits to ~2059
 export const TC_MIN_CONTRAST = 36; // min (white-black) luma delta to trust a read
 

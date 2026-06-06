@@ -25,6 +25,10 @@ export interface SyncConfig {
   alignAudio: boolean;
   /** Master switch: timecode-primary (true) vs getStats-only coarse mode (false). */
   useTimecode: boolean;
+  /** Fraction of the frame's top edge the viewer crops (when useTimecode is on) to
+   *  hide the timecode band + the H.264 ringing below it. A bit larger than the
+   *  band (3.5%); tunable live via the "crop" slider. */
+  cropFraction: number;
   /** How often to poll getStats for fallback latency + audio levels. */
   statsPollMs: number;
 }
@@ -38,6 +42,7 @@ export const defaultSyncConfig: SyncConfig = {
   playoutDelayMs: 0,
   alignAudio: true,
   useTimecode: true,
+  cropFraction: 0.08,
   statsPollMs: 500,
 };
 

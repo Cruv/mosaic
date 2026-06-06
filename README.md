@@ -210,7 +210,7 @@ In the viewer's controls, or `web/src/sync/config.ts` for defaults. Behind-live 
 slider, 0–500), `playoutDelayMs` (0 — browser jitter-buffer hint; 0 minimizes double-buffering),
 `maxBufferMs` (1000 — caps how far a feed can be delayed), `bufferWidth` (640 — frame buffer
 resolution; bounds memory, raise for sharper program output), `alignAudio` (true), `useTimecode`
-(true), `statsPollMs` (500).
+(true), `cropFraction` (0.08 — the live "crop" slider that hides the timecode band), `statsPollMs` (500).
 
 ---
 
@@ -248,7 +248,7 @@ resolution; bounds memory, raise for sharper program output), `alignAudio` (true
 
 > **Do streamers change their output resolution? No.** In the default (crop) mode you keep your
 > normal 1080p/720p output and just **add one Browser source**. The viewer crops the strip
-> automatically — the only ask is to keep essential content out of the top ~6% of the frame.
+> automatically — the only ask is to keep essential content out of the top ~8% of the frame.
 > (Resolution only changes in the optional zero-loss *overscan* mode below.)
 
 This is what lets the viewer measure each feed's true capture time. **Add a Browser source** to your
@@ -261,17 +261,18 @@ scene:
 
 The overlay paints a thin, high-contrast band across the **very top** of the frame. **Viewers never
 see it** — Mosaic crops that strip off before displaying every feed. You only need to keep your own
-content out of the top ~6% of the frame. (The overlay disciplines itself to the *Mosaic server*
+content out of the top ~8% of the frame. (The overlay disciplines itself to the *Mosaic server*
 clock, so your PC's clock does **not** need to be accurate — only the server's does.)
 
 **Two ways to run it:**
 
-- **Crop mode (default):** leave the top ~6% clear; the viewer clips it (a tiny zoom-to-fill, no
-  black bar). Simplest — no resolution change. (The band itself is 3.5%; the viewer crops a little
-  past it to also remove the H.264 ringing the band's hard edges leave underneath.)
-- **Overscan mode (zero image loss):** set your OBS **base canvas** to **1920 × 1152** and place your
-  1080 content in the bottom — the band + its margin then live in the extra height *above* it, and the
-  viewer crops back to a pristine 1080.
+- **Crop mode (default):** leave the top ~8% clear; the viewer clips it (a tiny zoom-to-fill, no
+  black bar). Simplest — no resolution change. The exact amount is a live **"crop"** slider in the
+  controls (default 8%) — raise it until the band is fully gone. (The band itself is 3.5%; the viewer
+  crops past it to also remove the H.264 ringing the band's hard edges leave underneath.)
+- **Overscan mode (zero image loss):** make your OBS **base canvas** taller than your content by your
+  crop %, put your content in the bottom, and the band lives in the extra height *above* it — the
+  viewer crops back to pristine content (e.g. 1920×1176 for 1080 content at 8% crop).
 
 > **No overlay?** The feed still works — the engine falls back to coarse WebRTC-stats timing and the
 > roster tags it `~` instead of `TC`. It just won't hit the frame-level target. See below.
