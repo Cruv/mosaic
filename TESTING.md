@@ -46,7 +46,7 @@ Make sure these ports are reachable on the server (open them in the firewall):
 **1. Stream** — OBS → Settings → **Stream**:
 - **Service:** `WHIP`
 - **Server:** `http://SERVER_IP:8889/NAME/whip`
-- **Bearer Token:** `streamer:changeme`
+- **Bearer Token:** leave **empty** (the default open setup) — or `streamer:<password>` if your server has a publish password set
 
 **2. Encoder** — OBS → Settings → **Output** → Output Mode = **Advanced**, Streaming tab:
 - **Encoder:** `x264`
@@ -98,22 +98,11 @@ it, PiP both feeds, and compare the readout — the two feeds should show the sa
 
 ## Remote friend (not on your LAN)?
 
-The media is WebRTC, so the computers need a network path to the server. Two ways:
-
-### Option A — Tailscale (quickest; everyone installs one app)
-
-Puts all machines on a virtual LAN — no port-forwarding, TLS, or STUN/TURN:
-
-1. Install Tailscale on the **server and both computers**; sign all into the same tailnet.
-2. On the server: `tailscale ip -4` → note the `100.x.y.z` address.
-3. Set `HOST_IP=100.x.y.z` in `.env`, then `docker compose up -d`.
-4. Everyone uses that **Tailscale IP** as `SERVER_IP` throughout Part 2.
-
-### Option B — Public via Nginx Proxy Manager + Let's Encrypt (friend installs nothing)
-
-Your friend needs only a browser + OBS. You provide a real cert (which also fixes OBS's
-self-signed-cert refusal). **Important: NPM proxies only the HTTP/WebSocket _signaling_ — the WebRTC
-_media_ is UDP and bypasses NPM, so you must also forward the media port.** One-time setup on your side:
+For friends outside your LAN, put Mosaic on the public internet behind **Nginx Proxy Manager + a
+Let's Encrypt cert**. They then need only a browser + OBS — nothing to install and **no VPN**, so it
+won't interfere with their game queue. The real cert also fixes OBS's self-signed-cert refusal.
+**Important: NPM proxies only the HTTP/WebSocket _signaling_ — the WebRTC _media_ is UDP and bypasses
+NPM, so you must also forward the media port.** One-time setup on your side:
 
 **1. DNS** — point two subdomains at your home public IP (use Dynamic DNS if it isn't static):
 `watch.example.com` and `ingest.example.com`.
@@ -161,9 +150,9 @@ traverse every NAT.
 
 | Symptom | Fix |
 | --- | --- |
-| Feed never appears in the roster | Confirm OBS shows "Streaming". Re-check the **Server URL** ends in `/whip` and the **Bearer Token** is exactly `streamer:changeme`. Make sure your `NAME` is unique. |
+| Feed never appears in the roster | Confirm OBS shows "Streaming". Re-check the **Server URL** ends in `/whip` and the **Bearer Token** matches your server (empty if MediaMTX has no auth). Make sure your `NAME` is unique. |
 | Thumbnail stays black | UDP **8189** must be reachable from the viewer to the server — check the server firewall. |
 | Badge shows `~` instead of `TC` | The overlay must sit at `0,0` covering the whole canvas, with nothing opaque over the top strip. Load it with `?debug=1` and confirm `synced: true`. |
 | Skew stays high (>100 ms) | Raise **Behind live** in the controls; confirm both OBS encoders use `zerolatency` + `CBR`; congested Wi-Fi widens jitter (prefer Ethernet). |
 | Video is choppy | Lower the OBS bitrate, use wired Ethernet, keep Keyframe Interval at `1` s. |
-| OBS won't connect from another network | Use **Tailscale** (above). |
+| OBS won't connect from another network | Plain setup is LAN-only; set up public access (above) to reach it from outside. |

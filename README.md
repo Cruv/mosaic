@@ -152,9 +152,9 @@ docker run -d --name mosaic --network host \
 
 ### Public access (NPM + Let's Encrypt)
 
-Want a remote friend to join with just a browser + OBS — no Tailscale? Front Mosaic with Nginx Proxy
-Manager + a Let's Encrypt cert. That handles HTTPS/secure-context and removes the "OBS rejects
-self-signed cert" blocker. **But NPM only proxies the HTTP/WebSocket signaling — the WebRTC _media_
+Want remote friends to join with just a browser + OBS — nothing to install, no VPN (so it won't
+interfere with their game queue)? Front Mosaic with Nginx Proxy Manager + a Let's Encrypt cert. That
+handles HTTPS/secure-context and removes the "OBS rejects self-signed cert" blocker. **But NPM only proxies the HTTP/WebSocket signaling — the WebRTC _media_
 is UDP and bypasses the proxy.** You need both halves:
 
 **1. Signaling (NPM + TLS)** — two proxy hosts, each with a cert and **Websockets Support** enabled:
@@ -222,7 +222,7 @@ buffer resolution; bounds memory, raise for sharper program output), `alignAudio
 | --- | --- |
 | **Service** | `WHIP` |
 | **Server** | `http://<HOST_IP>:8889/<your-name>/whip` — pick any unique `<your-name>` (it becomes your feed key) |
-| **Bearer Token** | `streamer:<MEDIAMTX_PUBLISH_PASS>` (default `streamer:changeme`; viewers need no token) |
+| **Bearer Token** | `streamer:changeme` with the bundled file-based config; leave **empty** if MediaMTX has no auth (the env-only quickstart). Viewers never need a token. |
 
 > **TLS note:** WHIP to a non-localhost host may require HTTPS depending on OBS build, and OBS
 > rejects self-signed certs. On a trusted LAN, plain `http://` to the LAN IP generally works. For
