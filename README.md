@@ -205,10 +205,12 @@ the **host network**, so there are no `-p` mappings — the ports below are what
 
 ### Sync engine knobs
 
-In the viewer's controls, or `web/src/sync/config.ts` for defaults: `targetBehindLiveMs` (400),
-`maxBehindLiveMs` (800), `maxBufferMs` (1000), `jitterMarginMs` (150), `bufferWidth` (640 — frame
-buffer resolution; bounds memory, raise for sharper program output), `alignAudio` (true),
-`useTimecode` (true), `statsPollMs` (500).
+In the viewer's controls, or `web/src/sync/config.ts` for defaults. Behind-live = the slowest feed's
+**measured** latency + `jitterMarginMs` (no blind floor): `jitterMarginMs` (60 — the "Sync buffer"
+slider, 0–500), `playoutDelayMs` (0 — browser jitter-buffer hint; 0 minimizes double-buffering),
+`maxBufferMs` (1000 — caps how far a feed can be delayed), `bufferWidth` (640 — frame buffer
+resolution; bounds memory, raise for sharper program output), `alignAudio` (true), `useTimecode`
+(true), `statsPollMs` (500).
 
 ---
 
@@ -287,7 +289,7 @@ Open `http://<HOST_IP>:8080`, enter a display name, and watch.
   between corners, **✕** removes it. Every PiP is aligned to the same timeline as the program.
 - **Roster** — live thumbnails. Each tile shows the feed's latency and a sync badge: **TC** =
   timecode-synced (frame-accurate), **~** = approximate (no overlay).
-- **Controls** — director strategy, volume, the **Behind live** slider (the latency/sync tradeoff),
+- **Controls** — director strategy, volume, the **Sync buffer** slider (latency vs jitter headroom),
   **Align audio**, **Timecode** on/off, and the **Sync HUD** toggle.
 - **Sync HUD** (bottom-right) — the live engine readout, including **inter-feed skew**, the headline
   alignment-quality number.
@@ -311,7 +313,7 @@ The goal: every visible feed displays the **same captured wall-clock instant** a
 3. **Buffer + align.** A live `<video srcObject=MediaStream>` can't be seeked, so each feed copies
    its frames (band cropped off) into a ring buffer tagged by capture time. The engine computes a
    single **target** = `serverNow − targetLatency`, where `targetLatency` = the slowest live feed's
-   latency + a jitter margin, clamped to the behind-live window. Each surface (program, PiP,
+   **measured** latency + a small jitter buffer (capped only by the ring-buffer depth). Each surface (program, PiP,
    thumbnails) then draws the buffered frame whose capture time matches the target — so leading feeds
    are held back to match the most-delayed one.
 4. **Continuous drift correction.** Because the engine re-selects the frame *by capture time* on
@@ -344,11 +346,14 @@ coarse and only works if RTCP SR survives the relay (see below).
 
 ### Latency-behind-live (the tradeoff)
 
-Tight sync **requires** running behind live, to absorb jitter and give the leading feeds room to be
-held back. Default target is **400 ms behind live**, tunable **250–800 ms** with the *Behind live*
-slider (`maxBufferMs` caps how far a feed can be delayed; default 1000 ms). Lower = closer to live but
-looser/less jitter-tolerant; higher = rock-solid alignment further behind live. **The product
-deliberately prioritizes inter-feed sync over minimizing latency.**
+Behind-live = each feed's **measured** end-to-end latency + a small **Sync buffer** (default 60 ms,
+0–500 ms in the controls) to absorb jitter and hold alignment — there's no blind floor, so latency
+only ever reflects what's actually needed. With several feeds the faster ones are delayed to match the
+slowest, so total latency is bounded by the slowest feed. We also set the browser's `playoutDelayHint`
+to ~0 so it doesn't double-buffer on top of our engine. The largest remaining term is each feed's own
+WebRTC pipeline (OBS encode + network + decode) — keep it low with the OBS encoder settings above
+(CBR + `zerolatency` + 1 s keyframe), and prefer 1080p over 1440p60 if encode latency is high. **The
+product prioritizes inter-feed sync over minimizing latency**, but never adds delay it can't measure.
 
 ### Where the residual error comes from
 

@@ -14,8 +14,13 @@ export interface SyncConfig {
   targetBehindLiveMs: number;
   /** Ceiling for how far behind live we present. */
   maxBehindLiveMs: number;
-  /** Added on top of the slowest feed's latency when choosing the target. */
+  /** Extra delay added on top of the slowest feed's measured latency — the
+   *  "Sync buffer" knob. Absorbs jitter and holds alignment; lower = less latency. */
   jitterMarginMs: number;
+  /** Browser WebRTC jitter-buffer hint (ms). 0 = minimize it so we don't
+   *  double-buffer on top of our own engine buffer (big latency win on a LAN).
+   *  Raise if a jittery/remote network causes stutter. */
+  playoutDelayMs: number;
   /** Delay program audio to match the buffered (delayed) program video. */
   alignAudio: boolean;
   /** Master switch: timecode-primary (true) vs getStats-only coarse mode (false). */
@@ -29,7 +34,8 @@ export const defaultSyncConfig: SyncConfig = {
   maxBufferMs: 1000,
   targetBehindLiveMs: 400,
   maxBehindLiveMs: 800,
-  jitterMarginMs: 150,
+  jitterMarginMs: 60,
+  playoutDelayMs: 0,
   alignAudio: true,
   useTimecode: true,
   statsPollMs: 500,

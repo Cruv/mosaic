@@ -59,22 +59,22 @@ export function Controls({
       </div>
 
       <div className="ctl-group">
-        <span className="ctl-label" title="How far behind live we present, to absorb jitter while staying aligned">
-          Behind live
+        <span
+          className="ctl-label"
+          title="Extra delay beyond each feed's own latency — absorbs jitter and holds alignment. Lower = less latency (more stutter risk on jittery networks)."
+        >
+          Sync buffer
         </span>
         <input
           className="range"
           type="range"
-          min={250}
-          max={800}
+          min={0}
+          max={500}
           step={10}
-          value={config.targetBehindLiveMs}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            onConfig({ targetBehindLiveMs: v, maxBehindLiveMs: Math.max(800, v) });
-          }}
+          value={config.jitterMarginMs}
+          onChange={(e) => onConfig({ jitterMarginMs: Number(e.target.value) })}
         />
-        <span className="ctl-value">{config.targetBehindLiveMs} ms</span>
+        <span className="ctl-value">{config.jitterMarginMs} ms</span>
       </div>
 
       <label className="ctl-check" title="Delay program audio to match the buffered video">

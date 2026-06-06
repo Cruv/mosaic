@@ -1,5 +1,5 @@
 import { Feed } from './feed';
-import { type SyncConfig, defaultSyncConfig, clamp } from './config';
+import { type SyncConfig, defaultSyncConfig } from './config';
 import type { TimeSync } from '../net/timeSync';
 import { AudioController } from './audioController';
 import { RoundRobinStrategy, type SwitchStrategy, type FeedSnapshot } from '../switch/strategy';
@@ -169,8 +169,11 @@ export class SyncEngine {
         anyLat = true;
       }
     }
+    // behind-live = slowest feed's MEASURED latency + a small jitter/alignment
+    // buffer (the "Sync buffer" control). With one feed that's just its latency +
+    // buffer; with several, faster feeds are held back to match the slowest. We
+    // never add a blind floor on top, so latency tracks what's actually needed.
     let target = anyLat ? maxLat + this.cfg.jitterMarginMs : this.cfg.targetBehindLiveMs;
-    target = clamp(target, this.cfg.targetBehindLiveMs, Math.max(this.cfg.maxBehindLiveMs, maxLat + 30));
     target = Math.min(target, this.cfg.maxBufferMs - 30);
     this.smoothedTarget = Number.isFinite(this.smoothedTarget)
       ? this.smoothedTarget * 0.9 + target * 0.1

@@ -59,6 +59,16 @@ export class Feed {
       }
       this.session = s;
       this.video.srcObject = s.stream;
+      // Minimize the browser's own jitter buffer — we do the buffering ourselves,
+      // so its extra delay is pure double-buffering. Biggest single latency win.
+      const hint = Math.max(0, (this.cfg.playoutDelayMs ?? 0) / 1000);
+      for (const r of s.pc.getReceivers()) {
+        try {
+          (r as unknown as { playoutDelayHint: number }).playoutDelayHint = hint;
+        } catch {
+          /* not supported in this browser */
+        }
+      }
       s.pc.addEventListener('connectionstatechange', () => {
         const st = s.pc.connectionState;
         if (st === 'failed' || st === 'disconnected' || st === 'closed') {
