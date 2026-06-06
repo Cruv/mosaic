@@ -38,10 +38,13 @@ export async function startWhep(url: string): Promise<WhepSession> {
   const answerSdp = await res.text();
   await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
 
-  // WHEP returns a resource URL (Location) we should DELETE on teardown so the
-  // server frees the session promptly instead of waiting for ICE timeout.
-  const location = res.headers.get('Location');
-  const resourceUrl = location ? new URL(location, url).toString() : null;
+  // WHEP returns a resource URL (Location) we DELETE on teardown so the server
+  // frees the session promptly instead of waiting for ICE timeout. `url` may be
+  // a relative path, so resolve the (possibly relative) Location against the
+  // absolute request URL.
+  const locHeader = res.headers.get('Location');
+  const reqAbs = new URL(url, window.location.href);
+  const resourceUrl = locHeader ? new URL(locHeader, reqAbs).toString() : null;
 
   let closed = false;
   return {

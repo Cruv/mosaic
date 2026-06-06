@@ -49,7 +49,8 @@ where the sync engine lives).
 - **Mosaic server** (`server/`) — polls MediaMTX's API ~1 Hz to maintain the live-feed roster (this
   is how drop-in/drop-out works — there is no coordinated start); a WebSocket hub for chat, reactions,
   roster push, and a time-sync service clients use to estimate their offset to the server's
-  NTP-disciplined clock; also serves the built viewer and the timecode overlay.
+  NTP-disciplined clock; also serves the built viewer and the timecode overlay, and proxies WHEP
+  signaling to MediaMTX so the browser stays same-origin (no cross-origin CORS).
 - **Web viewer** (`web/`) — a WHEP `RTCPeerConnection` per feed and the **sync engine**: it measures
   each feed's true capture time, aligns every visible feed to a common target presentation time
   derived from the most-delayed feed, and presents frames against that shared timeline. Plus the UI:
@@ -71,6 +72,9 @@ streamers point OBS at `http://<HOST_IP>:8889/<name>/whip` (see
 to GHCR and follows LinuxServer.io (`PUID`/`PGID`/`TZ`) conventions. Run it on a Linux host (TrueNAS
 SCALE box or a Linux VM) whose clock is NTP-disciplined (`chrony`/`systemd-timesyncd`) — that clock
 is the shared timeline every feed aligns to.
+
+> **Testing with two OBS streamers?** [**TESTING.md**](TESTING.md) is a copy-paste walkthrough you
+> can hand straight to a friend.
 
 > **Host networking is required** (not bound behind Nginx Proxy Manager like my other stacks): WebRTC
 > media can't traverse Docker's NAT or a reverse proxy. You *can* still front the `:8080` web UI with
@@ -165,8 +169,8 @@ the **host network**, so there are no `-p` mappings — the ports below are what
 | `-e MEDIAMTX_PUBLISH_PASS=changeme` | OBS publish password on the `mediamtx` service (`MTX_AUTHINTERNALUSERS_0_PASS`). OBS bearer token = `streamer:<this>`; viewers need none. |
 | `-v .../mediamtx/mediamtx.yml:/mediamtx.yml:ro` | MediaMTX config (ships in the repo). |
 
-**Ports in use:** `8080` web UI · `8889` WebRTC signaling/ICE-TCP · `8189/udp` WebRTC media ·
-`9997` MediaMTX API (localhost only).
+**Ports in use:** `8080` web UI + WebSocket + WHEP signaling · `8889` OBS WHIP ingest + ICE-TCP ·
+`8189/udp` WebRTC media · `9997` MediaMTX API (localhost only).
 
 ### Sync engine knobs
 

@@ -20,6 +20,7 @@ export class MosaicConnection {
   private relaxTimer = 0;
   private pingId = 0;
   private name = 'anon';
+  private welcomed = false; // replay chat backlog only on the first welcome
   private listeners: { [K in keyof EventMap]: Set<Listener<K>> } = {
     status: new Set(),
     roster: new Set(),
@@ -63,7 +64,11 @@ export class MosaicConnection {
         case 'welcome':
           this.time.seed(m.serverTime);
           this.emit('roster', m.feeds);
-          for (const msg of m.recent) this.emit('chat', msg);
+          // Don't re-emit the backlog on reconnect (would duplicate the log).
+          if (!this.welcomed) {
+            for (const msg of m.recent) this.emit('chat', msg);
+            this.welcomed = true;
+          }
           break;
         case 'time:pong':
           this.time.onPong(m.c0, m.s);

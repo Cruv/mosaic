@@ -10,6 +10,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8080',
       '/overlay': 'http://localhost:8080',
+      '/whep': 'http://localhost:8080', // covers /whep/:feed and /whep-resource
       '/ws': { target: 'ws://localhost:8080', ws: true },
     },
   },
