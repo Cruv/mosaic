@@ -98,19 +98,62 @@ it, PiP both feeds, and compare the readout — the two feeds should show the sa
 
 ## Remote friend (not on your LAN)?
 
-The prototype targets a single LAN. The easiest way to include a remote friend is **Tailscale**
-(free) — it puts everyone on a virtual LAN with no port-forwarding or TLS hassle:
+The media is WebRTC, so the computers need a network path to the server. Two ways:
+
+### Option A — Tailscale (quickest; everyone installs one app)
+
+Puts all machines on a virtual LAN — no port-forwarding, TLS, or STUN/TURN:
 
 1. Install Tailscale on the **server and both computers**; sign all into the same tailnet.
-2. On the server, get its Tailscale IP: `tailscale ip -4` → something like `100.x.y.z`.
-3. Set `HOST_IP=100.x.y.z` in `.env`, then `docker compose up -d` again.
-4. Everyone uses that **Tailscale IP** as `SERVER_IP` in Part 2.
+2. On the server: `tailscale ip -4` → note the `100.x.y.z` address.
+3. Set `HOST_IP=100.x.y.z` in `.env`, then `docker compose up -d`.
+4. Everyone uses that **Tailscale IP** as `SERVER_IP` throughout Part 2.
 
-**Friend can't install anything?** Go public with **Nginx Proxy Manager + Let's Encrypt** instead:
-they then need only a browser + OBS. You provide the cert (HTTPS fixes the OBS self-signed-cert
-blocker), port-forward `8189/udp`, and advertise your public IP. Full steps in
-[README → Public access](README.md#public-access-npm--lets-encrypt). Note NPM proxies the *signaling*
-only — the WebRTC media is UDP and still needs that port-forward (+ STUN, or TURN behind strict NAT).
+### Option B — Public via Nginx Proxy Manager + Let's Encrypt (friend installs nothing)
+
+Your friend needs only a browser + OBS. You provide a real cert (which also fixes OBS's
+self-signed-cert refusal). **Important: NPM proxies only the HTTP/WebSocket _signaling_ — the WebRTC
+_media_ is UDP and bypasses NPM, so you must also forward the media port.** One-time setup on your side:
+
+**1. DNS** — point two subdomains at your home public IP (use Dynamic DNS if it isn't static):
+`watch.example.com` and `ingest.example.com`.
+
+**2. Router port-forwards** → the Mosaic host:
+
+| Forward | To | Why |
+| --- | --- | --- |
+| `443/tcp` | NPM | HTTPS (you likely already have this) |
+| `80/tcp` | NPM | Let's Encrypt HTTP challenge (or use a DNS challenge) |
+| `8189/udp` | Mosaic host | **WebRTC media — NPM cannot do this for you** |
+
+`8889` does **not** need forwarding — OBS reaches it through NPM on 443.
+
+**3. NPM → add two Proxy Hosts.** For each: *Details* tab scheme `http`; *SSL* tab → request a new
+Let's Encrypt cert + "Force SSL":
+
+| Domain | Forward Hostname / Port | Extra |
+| --- | --- | --- |
+| `watch.example.com` | `127.0.0.1` : `8080` | turn on **Websockets Support** |
+| `ingest.example.com` | `127.0.0.1` : `8889` | — |
+
+(If NPM runs on a different box than Mosaic, use the Mosaic host's LAN IP instead of `127.0.0.1`.)
+
+**4. Advertise your public address + enable STUN.** In `.env` set
+`MTX_WEBRTCADDITIONALHOSTS=<LAN_IP>,<PUBLIC_IP>` (the comma-list keeps LAN viewing working too),
+uncomment the `stun:` line under `webrtcICEServers2` in `mediamtx/mediamtx.yml`, then
+`docker compose up -d`.
+
+**5. Connect.** Your friend follows **Part 2** with two changes:
+- **OBS → Server:** `https://ingest.example.com/<name>/whip` (Bearer Token unchanged)
+- **Watch at:** `https://watch.example.com`
+
+**6. If a friend's video won't connect** (strict/symmetric NAT, or UDP blocked on their network), add
+a **TURN** relay (e.g. `coturn`) to `webrtcICEServers2` and `docker compose up -d`. STUN alone can't
+traverse every NAT.
+
+> **Security:** you're now public. Keep `MEDIAMTX_PUBLISH_PASS` set, and note the default config lets
+> *anyone* view — lock that down in `mediamtx.yml` auth if you don't want an open door. Bonus: serving
+> over HTTPS makes the viewer a secure context, which unlocks the WebCodecs upgrade path.
 
 ---
 
