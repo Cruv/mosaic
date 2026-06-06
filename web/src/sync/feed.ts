@@ -1,6 +1,6 @@
 import { startWhep, type WhepSession } from '../net/whep';
 import { FrameBuffer, type Frame } from './frameBuffer';
-import { readTimecode, makeScratch, type TimecodeScratch, TC_BAND_FRACTION } from './timecode';
+import { readTimecode, makeScratch, type TimecodeScratch, TC_CROP_FRACTION } from './timecode';
 import type { TimeSync } from '../net/timeSync';
 import type { SyncConfig } from './config';
 
@@ -124,8 +124,9 @@ export class Feed {
     const inst = serverNow - captureMs;
     this.latencyMs = Number.isFinite(this.latencyMs) ? this.latencyMs * 0.85 + inst * 0.15 : inst;
 
-    // 3) crop the timecode band (only when present) and buffer the frame
-    const cropTop = this.hasTimecode ? Math.round(vh * TC_BAND_FRACTION) : 0;
+    // 3) crop the timecode band + its compression-ringing margin (only when
+    //    present) and buffer the frame
+    const cropTop = this.hasTimecode ? Math.round(vh * TC_CROP_FRACTION) : 0;
     const srcH = vh - cropTop;
     const bw = this.cfg.bufferWidth;
     const bh = Math.max(2, Math.round((bw * srcH) / vw));

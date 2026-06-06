@@ -246,7 +246,7 @@ buffer resolution; bounds memory, raise for sharper program output), `alignAudio
 
 > **Do streamers change their output resolution? No.** In the default (crop) mode you keep your
 > normal 1080p/720p output and just **add one Browser source**. The viewer crops the strip
-> automatically — the only ask is to keep essential content out of the top ~3.5% of the frame.
+> automatically — the only ask is to keep essential content out of the top ~6% of the frame.
 > (Resolution only changes in the optional zero-loss *overscan* mode below.)
 
 This is what lets the viewer measure each feed's true capture time. **Add a Browser source** to your
@@ -259,16 +259,17 @@ scene:
 
 The overlay paints a thin, high-contrast band across the **very top** of the frame. **Viewers never
 see it** — Mosaic crops that strip off before displaying every feed. You only need to keep your own
-content out of the top ~3.5% of the frame. (The overlay disciplines itself to the *Mosaic server*
+content out of the top ~6% of the frame. (The overlay disciplines itself to the *Mosaic server*
 clock, so your PC's clock does **not** need to be accurate — only the server's does.)
 
 **Two ways to run it:**
 
-- **Crop mode (default):** leave the top ~3.5% clear; the viewer clips it (a tiny zoom-to-fill, no
-  black bar). Simplest — no resolution change.
-- **Overscan mode (zero image loss):** set your OBS **base canvas** to **1920 × 1120** and place your
-  1080 content in the bottom — the ~40px band then lives in the extra height *above* it, and the
-  viewer crops back to a pristine 1080. (Band height = 3.5% of the frame.)
+- **Crop mode (default):** leave the top ~6% clear; the viewer clips it (a tiny zoom-to-fill, no
+  black bar). Simplest — no resolution change. (The band itself is 3.5%; the viewer crops a little
+  past it to also remove the H.264 ringing the band's hard edges leave underneath.)
+- **Overscan mode (zero image loss):** set your OBS **base canvas** to **1920 × 1152** and place your
+  1080 content in the bottom — the band + its margin then live in the extra height *above* it, and the
+  viewer crops back to a pristine 1080.
 
 > **No overlay?** The feed still works — the engine falls back to coarse WebRTC-stats timing and the
 > roster tags it `~` instead of `TC`. It just won't hit the frame-level target. See below.
